@@ -1,12 +1,33 @@
 import copy 
 import random
 
-#Codes for console output
+#################################################################
+#   Main game loop:                                             #
+#       - Machine's turn:                                       #
+#           - Identify best movements through minimax algorithm #
+#           - If no movements are possible, accept defeat       #
+#           - Move the piece accordingly                        #
+#           - Change turn                                       #
+#           - If player has no pieces, declare victory          #
+#       - Player's turn                                         #
+#           - If no movements are possible, accept defeat       #
+#           - Perform a move via desired input                  #
+#           - Move is extracted by evaluating the board state   #
+#           - Check if move made is legal                       #
+#           - Move the tile accordingly inside the program      #
+#           - Change turn                                       #
+#           - If machine has no pieces, declare victory         #
+#       - Difficulty can be controlled via depth of minimax     #
+#           - Higher depth implies harsher AI                   #
+#           - Higher depth increases computing time exp         #
+#   Optionally:                                                 #
+#       - Implement stalemate rules on main code                #
+#################################################################
+
+#Color codes for console output
 red = "\033[31m"
 blue = "\033[34m"
 white = "\033[37m"
-
-#TODO: Minimax algorithm implementation
 
 class Board:
     def __init__(self, turn = 1): #Initiates board
@@ -212,7 +233,6 @@ class Movement:
     def __repr__(self):
         movStr = "mov(" + str(self.iPos) + ", " + str(self.steps) + ")"
         return movStr
-
 class Minimax:
     def __init__(self): #Initiates class
         pass
@@ -226,7 +246,6 @@ class Minimax:
         if depth > 0: #If recursion going
             movesTable = board.GetMovesTable() #Obtain movesTable
             bestMoves = []
-            bestScore = 0
             for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each tile
                 if movesTable[i][j] == []: #If no moves, continue
                     continue
@@ -237,13 +256,12 @@ class Minimax:
                     boardClone.MoveTile(movement) #Make movement in clone board
                     boardClone.ChangeTurn() #Change clone board's turn
                     score += self.MiniMax(boardClone, depth - 1)[1] #Iterates for next turn and adds to score
-                    print(score)
                     if board.turn == 1: #If player ID 1
                         if bestScore is None or score > bestScore: #Maximize score
                             bestScore = score
                             bestMoves = [movement]
                         elif score == bestScore:
-                            bestMoves.append(bestMove) 
+                            bestMoves.append(movement) 
                     else:
                         if bestScore is None or score < bestScore: #Minimize score
                             bestScore = score
@@ -278,37 +296,3 @@ class Minimax:
                         score += board.turn * 50 #Add kill score
                     score += board.turn * 50 #Add kill score
         return score
-
-board = Board(-1)
-board.SetBoard()
-prevBoard = Board()
-minimax = Minimax()
-print(board)
-def mainTest():
-    if board.turn != 0:
-        movesTable = board.GetMovesTable()
-        anyMoves = any(movesTable[i][j] for i in range(6) for j in range(6))
-        print("Any moves available for turn", board.turn, ":", anyMoves)
-        movement = minimax.MiniMax(board, 3)[0]
-        if movement == Movement([0, 0]):
-            #TODO: fix this one, border checks may be cause
-            print(f"Player {-1 * board.turn} wins by blockage")
-            input()
-            board.turn = 0
-            mainTest()
-        print(movement)
-        board.MoveTile(movement)
-        board.ChangeTurn()
-        print(board)
-        if board.GetAmmountOf(board.turn) == 0 and board.GetAmmountOf(board.turn * 2) == 0:
-            print(f"Player {board.turn} wins")
-            input()
-            board.turn = 0
-            mainTest()
-        input()
-        mainTest()
-    else:
-        board.SetBoard()
-        board.turn = -1
-
-mainTest()
