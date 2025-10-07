@@ -196,10 +196,6 @@ class Movement:
         self.steps = steps
         if not steps:
             self.steps = []
-    def AddStep(self, k, h): #Adds a step to coords k, h
-        self.steps.append([k, h])
-    def Step(self):
-        self.iPos = [self.steps.pop(0)]
     def __eq__(self, other):
         if self.iPos == other.iPos and self.steps == other.steps:
             return True
@@ -207,4 +203,9 @@ class Movement:
     def __repr__(self):
         movStr = "mov(" + str(self.iPos) + ", " + str(self.steps) + ")"
         return movStr
+    def AddStep(self, k, h): #Adds a step to coords k, h
+        self.steps.append([k, h])
+    def Step(self):
+        self.iPos = [self.steps.pop(0)]
+
 
