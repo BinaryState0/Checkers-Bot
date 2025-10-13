@@ -23,77 +23,76 @@ from checkers import *
 #       - Implement stalemate rules on main code                #
 #################################################################
 
-gameBoard = Board(0)
-minimax = Minimax()
-difficulty = 3
+gameBoard = Board(0) #Create empty board
+minimax = Minimax() #Initialize minimax class
+difficulty = 3 #Global variables
 stale = 0
 totalCount = 12
 
-def GetInputPos(msg):
-    inputPos = input(msg)
-    inputPos = [int(x) for x in inputPos.split() if x.isnumeric()]
-    if len(inputPos) != 2:
+def GetInputPos(msg): #Returns coordinates from input or a default case if invalid
+    inputPos = input(msg) #Obtain input
+    inputPos = [int(x) for x in inputPos.split() if x.isnumeric()] #Extract numbers
+    if len(inputPos) != 2: #If not 2 numbers, return default
         return [-1, -1]
-    for i in inputPos:
-        if not 0 <= i <= 5:
+    for i in inputPos: #For each number
+        if not 0 <= i <= 5: #If not inside bounds, return default
             return [-1, -1]
     return inputPos
-def Main():
-    global stale, totalCount, difficulty
-    if gameBoard.turn == 0:
-        gameBoard.SetBoard()
-        gameBoard.turn = 1
-        stale = 0
-        totalCount = 12
-        print(gameBoard)
-        print("Welcome to PythonCheckers:")
-        difficulty = int(input("Please select your difficulty (1 to 5): \n"))
-        Main()
+def Main(): #Main game loop
+    global stale, totalCount, difficulty #Initializae global variables
+    if gameBoard.turn == 0: #If turn is 0 (Game ended)
+        gameBoard.SetBoard() #Set board for new game
+        gameBoard.turn = 1 #Set initial turn
+        stale = 0 #Reset stalemate count
+        totalCount = 12 #Reset tiles count
+        print(gameBoard) #Print initial board
+        print("Welcome to PythonCheckers:") 
+        difficulty = int(input("Please select your difficulty (1 to 5): \n")) #Difficulty selection
+        Main() #Loop
     else:
-        if gameBoard.turn == 1:
+        if gameBoard.turn == 1: #If player turn
             if gameBoard.GetAmmountOf(gameBoard.turn) == 0 and gameBoard.GetAmmountOf(gameBoard.turn * 2) == 0:
                 input(f"Player {gameBoard.turn} has lost, press enter to restart")
                 gameBoard.turn = 0
-                Main()
+                Main() #Loss by losing all pieces
             movement = minimax.MiniMax(gameBoard, 1)
             if movement[0] == Movement([0, 0]) or stale > 10:
                 input(f"Player {gameBoard.turn} has lost by stalemate, press enter to restart")
                 gameBoard.turn = 0
-                Main()
+                Main() #Loss by stalemate
             if totalCount != gameBoard.GetAmmountOf(gameBoard.turn) + gameBoard.GetAmmountOf(gameBoard.turn + 1):
                 totalCount = gameBoard.GetAmmountOf(gameBoard.turn) + gameBoard.GetAmmountOf(gameBoard.turn + 1)
-                stale = 0
+                stale = 0 
             else:
-                stale += 1
-            inputPos = GetInputPos("Which tile do you want to move (x  y)? \n")
-            inputTarget = GetInputPos("Where do you want to move (x  y)? \n")
-            movement = Movement(inputPos, [inputTarget])
-            if gameBoard.ValidateMovement(movement):
-                gameBoard.MoveTile(movement)
-                gameBoard.ChangeTurn()
-                print(gameBoard)
-                Main()
-            else:
+                stale += 1 #Check for stalemate
+            inputPos = GetInputPos("Which tile do you want to move <x  y>? \n") #Get position [x, y] for movement start
+            inputTarget = GetInputPos("Where do you want to move <x  y>? \n") #Get position [x, y] for movement ending
+            movement = Movement(inputPos, [inputTarget]) #Initialize coords as a movement TODO: implement multiple jumps
+            if gameBoard.ValidateMovement(movement): #Validate movement
+                gameBoard.MoveTile(movement) #Attempt movement
+                gameBoard.ChangeTurn() #Change turn
+                print(gameBoard) #Print current board
+                Main() #Loop
+            else: #If invalid
                 input("Invalid movement, press enter to try again")
-                Main()
+                Main() #Loop
         else:
             if gameBoard.GetAmmountOf(gameBoard.turn) == 0 and gameBoard.GetAmmountOf(gameBoard.turn * 2) == 0:
                 input(f"Player {gameBoard.turn} has lost, press enter to restart")
                 gameBoard.turn = 0
-                Main()
-                print(difficulty)
-            movement = minimax.MiniMax(gameBoard, difficulty)
+                Main() #Loss by losing all pieces
+            movement = minimax.MiniMax(gameBoard, difficulty) #Get minimax movement with depth difficulty
             if movement[0] == Movement([0, 0]) or stale > 10:
                 input(f"Player {gameBoard.turn} has lost by stalemate, press enter to restart")
                 gameBoard.turn = 0
-                Main()
+                Main() #Loss by stalemate
             if totalCount != gameBoard.GetAmmountOf(gameBoard.turn) + gameBoard.GetAmmountOf(gameBoard.turn + 1):
                 totalCount = gameBoard.GetAmmountOf(gameBoard.turn) + gameBoard.GetAmmountOf(gameBoard.turn + 1)
                 stale = 0
             else:
-                stale += 1
-            gameBoard.MoveTile(movement[0])
-            gameBoard.ChangeTurn()
-            print(gameBoard)
-            Main()
+                stale += 1 #Check for stalemate
+            gameBoard.MoveTile(movement[0]) #Make movement
+            gameBoard.ChangeTurn() #Change turn
+            print(gameBoard) #Print board
+            Main() #Move
 Main()
