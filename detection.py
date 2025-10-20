@@ -122,9 +122,9 @@ class Detection:
         board = [[0 for _ in range(6)] for _ in range(6)] #Empty 6x6 arraym
         playerTiles = Detection.Contours(frame, playerColor, 10, 100) #Obtain player tiles
         AITiles = Detection.Contours(frame, AIColor, 10, 100)
+        coords = Detection.FindBoardCoords(frame, boardMarkers) #Obtain board coords
         for tile in playerTiles: #For each tile
             centroid = Detection.Centroid(tile) #Obtain centroid
-            coords = Detection.FindBoardCoords(frame, boardMarkers) #Obtain board coords
             lowestDist = float("inf")
             tile = [-1, -1]
             for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each board position
@@ -135,7 +135,6 @@ class Detection:
             board[tile[0]][tile[1]] = 1 #Set board value at i, j to id
         for tile in AITiles: #For each tile
             centroid = Detection.Centroid(tile) #Obtain centroid
-            coords = Detection.FindBoardCoords() #Obtain board coords
             lowestDist = float("inf")
             tile = [-1, -1]
             for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each board position
