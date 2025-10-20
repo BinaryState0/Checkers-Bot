@@ -4,6 +4,7 @@ import cv2
 import argparse
 import transformations as tf  
 import numpy as np
+from checkers import *
 
 
 def show(frame):
@@ -95,37 +96,55 @@ def warp_to_original(point, M_inv):
     x_o, y_o, w = M_inv.dot(vec)
     return (int(round(x_o / w)), int(round(y_o / w)))
 
-def create_virtual_board(width, height, n=6):
-    """
-    Divide el cuadrado en n×n celdas.
-    Retorna una lista de celdas, cada una con ((x0, y0), (x1, y1)).
-    """
-    dx = width / n
-    dy = height / n
-    # Líneas divisorias (7 si n=6)
-    xs = [i * dx for i in range(n + 1)]
-    ys = [j * dy for j in range(n + 1)]
-    # Celdas entre líneas
-    celdas = []
-    for i in range(n):
-        for j in range(n):
-            x0, y0 = xs[i], ys[j]
-            x1, y1 = xs[i + 1], ys[j + 1]
-            celdas.append(((x0, y0), (x1, y1)))
-    return celdas, xs, ys
+def cell_index(punto, width, height, n=6):
+    px, py = punto
+    xs = np.linspace(0, width, n + 1)
+    ys = np.linspace(0, height, n + 1)
 
-def cell_index(punto, xs, ys):
-    x, y = punto
-    i = np.searchsorted(xs, x) - 1
-    j = np.searchsorted(ys, y) - 1
-    if 0 <= i < len(xs) - 1 and 0 <= j < len(ys) - 1:
+    i = np.searchsorted(xs, px) - 1
+    j = np.searchsorted(ys, py) - 1
+
+    if 0 <= i < n and 0 <= j < n:
         return i, j
+    else:
+        return None
 
-def main():
+def locate_centroid(contours, dibujar=False, imagen=None):
+    centroides = []
+    img_result = imagen.copy() if dibujar and imagen is not None else None
+
+    for cnt in contours:
+        M = cv2.moments(cnt)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            centroides.append((cx, cy))
+            if dibujar and img_result is not None:
+                cv2.circle(img_result, (cx, cy), 5, (0, 0, 255), -1)
+
+    return (centroides, img_result) if dibujar else (centroides, None)
+
+def lay_board(current_board, centroids, player):
+    working_board = current_board
+    value = 0
+    if player == 1:
+        value = 1
+    if player == 2:
+        value = -1
+    for cnt in centroids:
+        print(cnt)
+        x, y = cell_index(cnt, 600, 600)
+        print(x, y)
+        working_board.board[y][x] = value
+    return working_board
+
+# Capture es una función que como su nombre índica, captura con la cámara del robot el tablero y lo traslada a un array compatible con checkers.py 
+
+def capture(board):
     #robot = RobotClient("10.200.145.103")
 
     #frame = robot.capture()
-    frame = cv2.imread('boardexample.png')
+    frame = cv2.imread('boardperspective.png')
     
     show(frame)
 
@@ -133,24 +152,32 @@ def main():
     # Vean: utils/getHsv.py
     # cv2.imwrite("frame.jpg", frame)
 
-    # Seleccionar los umbrales
-    board_colorsMin = [122, 54, 0]
-    board_colorsMax = [179, 255, 255]
-    lower = np.array([board_colorsMin])
-    upper = np.array([board_colorsMax])
+    # Seleccionar los umbrales (tablero)
+    board_colorsMin = [137, 54, 0]
+    board_colorsMax = [151, 255, 255]
+    board_lower = np.array([board_colorsMin])
+    board_upper = np.array([board_colorsMax])
+
+    # Siguiendo el orden dado por playCheckers, Player 1 (ø) es IA [Orientación Norte], Player 2 (o) [Sur] es el jugador humano que da la primera jugada.
+    Player1_colorsMin = [72, 80, 0]
+    Player1_colorsMax = [125, 255, 255]
+    Player1_lower = np.array([Player1_colorsMin])
+    Player1_upper = np.array([Player1_colorsMax])
+
+    Player2_colorsMin = [0, 0, 0]
+    Player2_colorsMax = [3, 255, 255]
+    Player2_lower = np.array([Player2_colorsMin])
+    Player2_upper = np.array([Player2_colorsMax])
 
     # Crear la imagen HSV y aplicar el umbral
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, lower, upper)
-    show(mask)
-    print(mask.shape)
+    mask = cv2.inRange(hsv, board_lower, board_upper)
     #kernel = np.ones((5,5), np.uint8) # matriz de 1s de 5x5
     #mask2 = cv2.erode(mask, kernel)
-    #show(mask2)
+    show(mask)
 
     # Encontrar los contornos
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    print(f"N° de Contornos: {len(contours)}")
 
     for cnt in contours:
     # Aproximar contornos a un polígono
@@ -167,7 +194,7 @@ def main():
 
     ordered = order_points(approx)
 
-    # 2️Definir las coordenadas de destino (cuadrado “ideal”)
+    # Definir las coordenadas de destino (cuadrado “ideal”)
     width, height = 600, 600  # puedes ajustar este tamaño
     dst_pts = np.array([
         [0, 0],
@@ -186,42 +213,70 @@ def main():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    width, height = 600, 600
-    celdas, xs, ys = create_virtual_board(width, height)
+    # Setearemos el tablero. Dado que esta función debe de tener como salida un tablero para cada jugada.
 
-    # punto del objeto (por ejemplo, centro de contorno) [Este objeto está en el nuevo sistema de referencia]
-    # se hará luego el barrido que detecte cada ficha en este nuevo sistema, obteniendo direcciones que serán transformadas de vuelta al sistema original para el movimiento de la maquina
-    p_objeto = (600, 600)
-    img_vis = warped.copy()
-    i, j = cell_index(p_objeto, xs, ys)
-    print(f"El objeto está en la celda ({i}, {j})")
-    # Dibujar cuadrícula
-    for i in range(1, 6):
-        for x in xs:
-            cv2.line(img_vis, (int(x), 0), (int(x), height), (100, 100, 100), 1)
-        for y in ys:
-            cv2.line(img_vis, (0, int(y)), (width, int(y)), (100, 100, 100), 1)
+    # Ahora veremos los jugadores.
 
-    # Marcar el punto del objeto
-    cv2.circle(img_vis, (int(p_objeto[0]), int(p_objeto[1])), 5, (0, 0, 255), -1)
+    hsv = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, Player1_lower, Player1_upper)
 
-    cv2.imshow("Cuadricula 6x6", img_vis)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # Suavizado. Player 1
 
-    # Extraemos el centroide
-    cx, cy = extract_centroid(contours)
+    kernel = np.ones((5,5), np.uint8) # matriz de 1s de 5x5
+    mask2 = cv2.erode(mask, kernel)
+    show(mask2)
+
+    contours, _ = cv2.findContours(mask2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    print(f"N° de Contornos (Jugador 1): {len(contours)}")
+
+    show_bounding_boxes(warped.copy(), contours)
+
+    centroids, image_centroids = locate_centroid(contours, dibujar=True, imagen=mask2)
+
+    print(centroids)
+    show(image_centroids)
+
+    #Ahora veremos donde deben de estar los centroides. Tercera variable define si es jugador 1 o 2
+    board = lay_board(board, centroids, 1)
+    print(board)
+
+    #Repetimos con Jugador 2 -----------------------------------------------------------------------------
+
+    mask = cv2.inRange(hsv, Player2_lower, Player2_upper)
+    show(mask)
+
+    # Suavizado. Player 2
+
+    kernel = np.ones((5,5), np.uint8) # matriz de 1s de 5x5
+    mask2 = cv2.erode(mask, kernel)
+    show(mask2)
+
+    contours, _ = cv2.findContours(mask2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    print(f"N° de Contornos (Jugador 2): {len(contours)}")
+
+    show_bounding_boxes(warped.copy(), contours)
+
+    centroids, image_centroids = locate_centroid(contours, dibujar=True, imagen=mask2)
+
+    print(centroids)
+    show(image_centroids)
+
+    #Ahora veremos donde deben de estar los centroides. Tercera variable define si es jugador 1 o 2
+    board = lay_board(board, centroids, 2)
+    print(board)
+
+    #cx, cy = extract_centroid(contours)
 
     # Dibujar el centroide
     #cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -1)
     #show(frame)
 
     # Transformar de coordenadas de la imagen a coordenadas del robot
-    x, y = transforma(cx, cy)
+    #x, y = transforma(cx, cy)
 
     # Mover el robot con cinemática inversa
     #robot.move_xyz(x, y, z=0.0)
 
-
-if __name__ == "__main__":
-    main()
+gameBoard = Board(0)
+gameBoard.SetBoard
+capture(gameBoard)
