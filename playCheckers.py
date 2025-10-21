@@ -11,8 +11,8 @@ from checkers import *
 #       - Player's turn                                         #
 #           - If no movements are possible, accept defeat       #
 #           - Perform a move via desired input                  #
-#           - Move is extracted by evaluating the board state   #
-#           - Check if move made is legal                       #
+#           - Move == extracted by evaluating the board state   #
+#           - Check if move made == legal                       #
 #           - Move the tile accordingly inside the program      #
 #           - Change turn                                       #
 #           - If machine has no pieces, declare victory         #
@@ -35,12 +35,14 @@ def GetInputPos(msg): #Returns coordinates from input or a default case if inval
     if len(inputPos) != 2: #If not 2 numbers, return default
         return [-1, -1]
     for i in inputPos: #For each number
-        if not 0 <= i <= 5: #If not inside bounds, return default
+        if not 1 <= i <= 6: #If not inside bounds, return default
             return [-1, -1]
+    inputPos[0] -= 1
+    #inputPos[1] -= 1
     return inputPos
 def Main(): #Main game loop
     global stale, totalCount, difficulty #Initializae global variables
-    if gameBoard.turn == 0: #If turn is 0 (Game ended)
+    if gameBoard.turn == 0: #If turn == 0 (Game ended)
         gameBoard.SetBoard() #Set board for new game
         gameBoard.turn = 1 #Set initial turn
         stale = 0 #Reset stalemate count
@@ -75,6 +77,7 @@ def Main(): #Main game loop
                 Main() #Loop
             else: #If invalid
                 input("Invalid movement, press enter to try again")
+                print(gameBoard)
                 Main() #Loop
         else:
             if gameBoard.GetAmmountOf(gameBoard.turn) == 0 and gameBoard.GetAmmountOf(gameBoard.turn * 2) == 0:

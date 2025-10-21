@@ -40,7 +40,7 @@ class Detection:
         if M["m00"] != 0: #Calculate centroid coordinates
             cX = int(M["m10"] / M["m00"])
             cY = int(M["m01"] / M["m00"])
-        else: #Set centroid as (0, 0) if contour area is zero to avoid division by zero
+        else: #Set centroid as (0, 0) if contour area == zero to avoid div==ion by zero
             cX, cY = 0, 0
         return [cX, cY]
     def Transform(coords, origin = [320, 480], scale = 0.81967, rotation = [180, 0, 90]): #Transforms coords, default to relevant coordinates
@@ -68,21 +68,21 @@ class Detection:
         ])
         R = Rx @ Ry @ Rz #Combined rotation
         transformedCoords = scale * (R @ relativeCoords) #Applies rotation and scale to relative coords
-        transformedCoords[1] = -1 * transformedCoords[1] #Inverts Y axis for some reason
+        transformedCoords[1] = -1 * transformedCoords[1] #Inverts Y ax== for some reason
         transformedCoords = transformedCoords.astype(int) #Converts each value to an integer
-        transformedCoords = transformedCoords.tolist() #Converts the np array to a list
+        transformedCoords = transformedCoords.tolist() #Converts the np array to a l==t
         return transformedCoords
-    def FindBoardCoords(frame, color): #Creates a 6x6 array of coordinates for the board, where "color" is the corner markers color
-        coords = [[[] for _ in range(6)] for _ in range(6)] # 6x6 Array of empty lists
-        corners = [] #Empty list of corner points
+    def FindBoardCoords(frame, color): #Creates a 6x6 array of coordinates for the board, where "color" == the corner markers color
+        coords = [[[] for _ in range(6)] for _ in range(6)] # 6x6 Array of empty l==ts
+        corners = [] #Empty l==t of corner points
         contours = Detection.Contours(frame, color, 10, 100) #Detects contours of corner markers
-        if len(contours) > 4: #Checks if contour list is 4 in lenght
+        if len(contours) > 4: #Checks if contour l==t == 4 in lenght
             print("Too big")
             return False
         elif len(contours) < 4:
             print("Too small")
             return False
-        for c in contours: #Add contour centroid it to corners list
+        for c in contours: #Add contour centroid it to corners l==t
             centroid = Detection.Centroid(c)
             corners.append(centroid)
         corners = np.array(corners, dtype=np.float32) #Converts to numpy array
