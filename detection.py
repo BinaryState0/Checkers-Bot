@@ -1,7 +1,12 @@
-#from checkers import Board #Testing only
 import cv2
-import numpy as np
+import numpy
 import math
+
+#Color codes for console output
+red = "\033[31m"
+blue = "\033[34m"
+white = "\033[37m"
+yellow = "\033[33m"
 
 class Color:
     def __init__(self, H = 0, S = 0, V = 0): #Initializes with HSV values
@@ -9,8 +14,8 @@ class Color:
     def AsArray(self): #Returns HSV values as array
         return [self.H, self.S, self.V]
     def AsRange(self, range = 0, isLow = True): #Returns low or high value of a range
-        if isLow: return np.array([self.H - range, self.S - range, self.V - range])
-        else: return np.array([self.H + range, self.S + range, self.V + range])
+        if isLow: return numpy.array([self.H - range, self.S - range, self.V - range])
+        else: return numpy.array([self.H + range, self.S + range, self.V + range])
 class Detection:
     def __init__(self): #Initializes camera
         pass
@@ -46,24 +51,24 @@ class Detection:
     def Transform(coords, origin = [320, 480], scale = 0.81967, rotation = [180, 0, 90]): #Transforms coords, default to relevant coordinates
         coords = [coords[0], coords[1], 0]
         origin = [origin[0], origin[1], 0]
-        coords = np.array(coords, dtype=np.float64) #Creates numpy arrays
-        origin = np.array(origin, dtype=np.float64)
+        coords = numpy.array(coords, dtype=numpy.float64) #Creates numpy arrays
+        origin = numpy.array(origin, dtype=numpy.float64)
         relativeCoords = coords - origin #Translates to origin
-        rx, ry, rz = np.deg2rad(rotation) #Transforms rotation to radians
+        rx, ry, rz = numpy.deg2rad(rotation) #Transforms rotation to radians
         #Rotation arrays
-        Rx = np.array([
+        Rx = numpy.array([
             [1, 0, 0],
-            [0, np.cos(rx), -np.sin(rx)],
-            [0, np.sin(rx),  np.cos(rx)]
+            [0, numpy.cos(rx), -numpy.sin(rx)],
+            [0, numpy.sin(rx),  numpy.cos(rx)]
         ])
-        Ry = np.array([
-            [ np.cos(ry), 0, np.sin(ry)],
+        Ry = numpy.array([
+            [ numpy.cos(ry), 0, numpy.sin(ry)],
             [0, 1, 0],
-            [-np.sin(ry), 0, np.cos(ry)]
+            [-numpy.sin(ry), 0, numpy.cos(ry)]
         ])
-        Rz = np.array([
-            [np.cos(rz), -np.sin(rz), 0],
-            [np.sin(rz),  np.cos(rz), 0],
+        Rz = numpy.array([
+            [numpy.cos(rz), -numpy.sin(rz), 0],
+            [numpy.sin(rz),  numpy.cos(rz), 0],
             [0, 0, 1]
         ])
         R = Rx @ Ry @ Rz #Combined rotation
@@ -77,32 +82,32 @@ class Detection:
         corners = [] #Empty l==t of corner points
         contours = Detection.Contours(frame, color, 10, 100) #Detects contours of corner markers
         if len(contours) > 4: #Checks if contour l==t == 4 in lenght
-            print("Too big")
+            print(yellow + "Too many contours have been detected, couldnt parse board" + white)
             return False
         elif len(contours) < 4:
-            print("Too small")
+            print(yellow + "Too little contours have been detected, couldnt parse board" + white)
             return False
         for c in contours: #Add contour centroid it to corners l==t
             centroid = Detection.Centroid(c)
             corners.append(centroid)
-        corners = np.array(corners, dtype=np.float32) #Converts to numpy array
+        corners = numpy.array(corners, dtype=numpy.float32) #Converts to numpy array
         s = corners.sum(axis=1) #Orders corners as Top-left, Top-right, Bottom-right, Bottom-left
-        diff = np.diff(corners, axis=1)
-        ordered = np.zeros((4,2), dtype=np.float32)
-        ordered[0] = corners[np.argmin(s)]
-        ordered[2] = corners[np.argmax(s)]
-        ordered[1] = corners[np.argmin(diff)]
-        ordered[3] = corners[np.argmax(diff)] 
+        diff = numpy.diff(corners, axis=1)
+        ordered = numpy.zeros((4,2), dtype=numpy.float32)
+        ordered[0] = corners[numpy.argmin(s)]
+        ordered[2] = corners[numpy.argmax(s)]
+        ordered[1] = corners[numpy.argmin(diff)]
+        ordered[3] = corners[numpy.argmax(diff)] 
         corners = ordered
         board_size = 100 #Distorts board to account for perspective
-        dstCorners = np.array([
+        dstCorners = numpy.array([
             [0, 0],
             [0, board_size],
             [board_size, board_size],
             [board_size, 0]
-        ], dtype=np.float32)
+        ], dtype=numpy.float32)
         M = cv2.getPerspectiveTransform(corners, dstCorners)
-        MInv = np.linalg.inv(M)
+        MInv = numpy.linalg.inv(M)
         for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each tile coord
             a = (i + 0.5) / 6 #Get position constants
             b = (j + 0.5) / 6
@@ -112,7 +117,7 @@ class Detection:
             a * b * dstCorners[2] +
             (1 - a) * b * dstCorners[3]
             ) #Calculates position
-            posHom = np.array([posWarped[0], posWarped[1], 1]) #Warps the position back to perspective
+            posHom = numpy.array([posWarped[0], posWarped[1], 1]) #Warps the position back to perspective
             posOrigHom = MInv @ posHom
             posOrigHom /= posOrigHom[2]
             posOrig = posOrigHom[:2].astype(int) #converts to int
@@ -144,16 +149,3 @@ class Detection:
                     tile = [i, j]
             board[tile[0]][tile[1]] = -1 #Set board value at i, j to id
         return board
-
-#Tested:
-#frame = cv2.imread("frame_perspective.jpg")
-#frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
-#green = Color(50, 150, 220)
-#red = Color(0, 210, 255)
-#gameBoard = Board()
-#gameBoard.board = Detection.ReadBoard(frame, green, Color(50, 50, 50), red)
-#print(gameBoard)
-#coords = Detection.FindBoardCoords(frame, red)
-#for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]:
-#    cv2.circle(frame, coords[i][j], radius=5, color=(255, 0, 0), thickness=-1)
-#Detection.Show(frame)

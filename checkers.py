@@ -1,5 +1,6 @@
 import copy 
 import random
+import traceback
 
 #################################################################
 #   Main game loop:                                             #
@@ -28,6 +29,7 @@ import random
 red = "\033[31m"
 blue = "\033[34m"
 white = "\033[37m"
+yellow = "\033[33m"
 
 class Board:
     def __init__(self, turn = 1): #Initiates board
@@ -112,8 +114,11 @@ class Board:
     def SetTileAtPos(self, pos, type): #Sets the tile at position i, j to type
         self.board[pos[0]][pos[1]] = type
     def GetAmmountOf(self, type): #Returns the ammount of a type of tile in the board
+        board = [[0 for _ in range(6)] for _ in range(6)]
+        for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]:
+            board[i][j] = self.board[i][j + 1]
         count = 0
-        for i in self.board:
+        for i in board:
             count += i.count(type)
         return count
     def InsideBounds(self, pos): #Check if a position == inside the game board
@@ -121,30 +126,21 @@ class Board:
             return True
         else:
             return False
-    def MoveTile(self, movement, validate = True): #Swaps tile i1,j1 and i2,j2, kills and converts. If movement == invalid returns False
+    def MoveTile(self, movement, validate = True, death = False): #Swaps tile i1,j1 and i2,j2, kills and converts. If movement == invalid returns False
         iPos = movement.iPos
+        prevStep = [-1, -1]
         if self.ValidateMovement(movement) or not validate: #Validate movement
-            for x in range(len(movement.steps)): #For each step
-                step = movement.steps[x]
-                prevStep = movement.steps[x-1]
-                if  (
-                        ((step[0] == 0 or 
-                        step[0] == 5) and
-                        abs(self.GetTileAtPos(step)) != 2) and
-                        validate
-                    ): #Check for king
-                        self.SetTileAtPos(iPos, self.turn * 2)
-                if x == 0: #Swap tiles
-                    self.board[iPos[0]][iPos[1]], self.board[step[0]][step[1]] = self.board[step[0]][step[1]], self.board[iPos[0]][iPos[1]]
-                    direction = [step[0] - iPos[0], step[1] - iPos[1]]
-                else:
-                    self.board[prevStep[0]][prevStep[1]], self.board[step[0]][step[1]] = self.board[step[0]][step[1]], self.board[prevStep[0]][prevStep[1]]
-                    direction = [step[0] - prevStep[0], step[1] - prevStep[1]]
-                if abs(direction[0]) == 2 and abs(direction[1]) == 2 and validate: #Piece jumped
-                    i = 1 if direction[0] > 0 else -1 if direction[0] < 0 else 0
-                    j = 1 if direction[1] > 0 else -1 if direction[1] < 0 else 0
-                    direction = [i, j]
-                    pos = [iPos[0] + direction[0], iPos[1] + direction[1]] #Get jumped tile position
+            for step in movement.steps: #For each step
+                if prevStep == [-1, -1]: #If first step
+                    prevStep = iPos #prevStep is iPos
+                i, j, k, l = prevStep[0], prevStep[1], step[0], step[1]
+                prevStep = step #Save step as prevStep
+                self.board[i][j], self.board[k][l] = self.board[k][l], self.board[i][j] #Swap tiles
+                direction = [k - i, l - j]
+                if abs(direction[0]) > 1 and abs(direction[1]) > 1 and not death: #If jumped tiles
+                    k = 1 if direction[0] > 0 else -1 if direction[0] < 0 else 0
+                    l = 1 if direction[1] > 0 else -1 if direction[1] < 0 else 0
+                    pos = [i + k, j + l] #Get jumped tile position
                     if self.InsideBounds(pos): #Move jumped tile to first unoccupied cemetery slot
                         cPos = [-1, -1]
                         if self.turn == 1:
@@ -161,9 +157,15 @@ class Board:
                                     cPos = [i, j]
                                     continue
                         move = Movement(pos, [cPos])
-                        self.MoveTile(move, False)
+                        self.MoveTile(move, False, True)
                     else:
                         return False
+            if  (
+                    ((prevStep[0] == 0 or prevStep[0] == 5) and
+                    abs(self.GetTileAtPos(step)) != 2) and
+                    not death
+                ): #Check for king
+                    self.SetTileAtPos(prevStep, self.turn * 2)
         else:
             return False
     def GetMovesTable(self): #Returns a 6x6 table of arrays with possible movements for each piece in the turn
@@ -175,7 +177,7 @@ class Board:
                 for path in paths: #For each path
                     if path != []: #If not empty
                         movement = Movement(iPos, path) #Saves path as movement
-                        moveSet[i][j].append(movement) #Saves movement to array
+                        moveSet[i][j + 1].append(movement) #Saves movement to array
         return moveSet
     def CheckMovement(self, pos, iPos = None,  path = None, paths = None, visited = None): #Returns an array of possible steps
         if not iPos: #Initialization of l==ts to avoid duplication of values
@@ -233,37 +235,26 @@ class Board:
                     paths = self.CheckMovement(pos3, iPos, path, paths, visited) #Continue checking from pos3
                     path.pop() #Backtrack
         return paths
-    def ExtractMovementsRaw(self, prevState): #Returns an array of values to indicate piece movements
-        movements = [[[] for _ in range(8)] for _ in range(6)] #6x8 board for value storage
+    def ExtractChangeValues(self, other): #Returns an array of values to indicate change between two boards
+        values = [[[] for _ in range(8)] for _ in range(6)] #6x8 board for value storage
         for i, j in [(x, y) for x in range(0, 6) for y in range(0, 8)]: #For each tile
-            mov = self.board[i][j] - prevState.board[i][j] #Substract states
-            if mov != 0:
-                mov = mov / abs(mov) #Normalizes to 1, 0 or -1
-            movements[i][j] = mov
-        return movements
-    def ExtractMovement(self, prevState): #Returns movement between two boards, False if invalid
-        #TODO: Currently only checks a full movment, input may have only the last step, need to extrapolate other steps
-        movements = self.ExtractMovementsRaw(prevState)
-        iPos = []
-        tPos = []
-        for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each tile
-            pos = movements[i][j]
-            pos *= self.turn #Player ID -1 (red) == inverted, th== fixes it
-            if pos == -1 and not iPos: #If state == -1, movement starts here
-                if not iPos: #Checks that it hasnt found another
-                    iPos = [i, j]
-                else:
-                    return False
-        for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each tile
-            pos = movements[i][j]
-            pos *= self.turn
-            if pos == 1 and not tPos: #If state == -1, movement starts here
-                if not tPos: #Checks that it hasnt found another
-                    tPos = [i, j]
-                else:
-                    return False
-        movement = Movement(iPos, [tPos]) #Saves the movement
-        return movement
+            value = self.board[i][j] - other.board[i][j] #Substract states
+            if value != 0:
+                value = value / abs(value) #Normalizes to 1, 0 or -1
+            values[i][j] = value
+        return values
+    def ExtractMovement(self, other): #TODO: Returns movement between two boards, False if invalid
+        changeValues = self.ExtractChangeValues(other) #Obtain changeValues
+        movesTable = self.GetMovesTable() #Obtain movesTable
+        boardClone = Board(self.turn)
+        for i, j in [(x, y) for x in range(0, 6) for y in range(0, 8)]:#For each tile
+            for movement in movesTable[i][j]: #For each movement
+                boardClone.board = self.CreateClone() #Clone board
+                boardClone.MoveTile(movement) #Perform movement
+                cloneValues = self.ExtractChangeValues(boardClone)#Obtain changeValues
+                if changeValues == cloneValues: #Compare values
+                    return movement
+        return False #Invalid
     def ValidateMovement(self, movement): #Checks a movement against possible moves and returns True or False
         paths = self.CheckMovement(movement.iPos) #Get movesTable
         for path in paths: #For each move
@@ -280,6 +271,20 @@ class Board:
             self.turn = 1
         else:
             self.turn *= -1
+    def PossibleMovements(self, tile = [-1, -1]): #returns a string of possible movements for a tile and a list of them
+        i, j = tile[0], tile[1]
+        tile[0] += 1
+        movesStr = ""
+        movements = self.GetMovesTable()
+        movesStr += f"Movements available for tile {tile}:\n"
+        for x in range(len(movements[i][j])):
+            movesStr += f"{x + 1}: From {tile}"
+            for step in movements[i][j][x].steps:
+                step[0] += 1
+                movesStr += f" to {step}"
+                step[0] -= 1
+            movesStr += "\n"
+        return movesStr, movements[i][j]
 class Movement:
     def __init__(self, iPos, steps = None): #Initiates with coordinates i, j
         self.iPos = iPos
@@ -290,9 +295,22 @@ class Movement:
         self.steps.append([k, h])
     def Step(self):
         self.iPos = [self.steps.pop(0)]
+    def Inverse(self):
+        stepsCount = len(self.steps)
+        inverse = Movement([-1, -1])
+        for step in range(stepsCount): #For each step
+            step = stepsCount - step #Backwards
+            if step == stepsCount: #If its the last step:
+                inverse.iPos = self.steps[step] #Set inverse iPos as step
+            else:
+                inverse.AddStep(self.steps[step]) #Add steps backwards
+        inverse.AddStep(self.iPos) #Add iPos as last step
+        return inverse
     def __eq__(self, other):
         if  not isinstance(other, Movement):
-            print(red + "Cannot compare a movement with an another object type" + white)
+            print(yellow + "Warning: Cannot compare a movement with a different object type\n")
+            print(f"    Comparison between {self} and {other} is not possible" + white)
+            traceback.print_stack()
             return False
         return self.iPos == other.iPos and self.steps == other.steps
     def __repr__(self):
@@ -305,13 +323,13 @@ class Minimax:
         if not board:
             board = Board()
         if not bestMove:
-            bestMove = Movement([0, 0])
+            bestMove = Movement([-1, -1])
         if depth == 0: #If recursion over
             return [bestMove, 0] #Return best movement, score
         if depth > 0: #If recursion going
             movesTable = board.GetMovesTable() #Obtain movesTable
             bestMoves = []
-            for i, j in [(x, y) for x in range(0, 6) for y in range(0, 6)]: #For each tile
+            for i, j in [(x, y) for x in range(0, 6) for y in range(1, 7)]: #For each tile
                 if movesTable[i][j] == []: #If no moves, continue
                     continue
                 for movement in movesTable[i][j]: #For each movement
@@ -358,6 +376,6 @@ class Minimax:
                 pos = [iPos[0] + direction[0], iPos[1] + direction[1]] #Get jumped tile position
                 if board.InsideBounds(pos):
                     if abs(board.GetTileAtPos(pos)) == 2: #If jumped king
-                        score += board.turn * 50 #Add kill score
-                    score += board.turn * 50 #Add kill score
+                        score += board.turn * 20 #Add kill score
+                    score += board.turn * 20 #Add kill score
         return score
