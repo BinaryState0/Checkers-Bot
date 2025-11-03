@@ -11,12 +11,11 @@ otherBoard = Board()
 frame1 = cv2.imread('Frame1.jpg')
 frame2 = cv2.imread('Frame2.jpg')
 
-board.board = Detection.ReadBoard(frame1, pinkColor, orangeColor, redColor)
-print(board)
+coords = Detection.FindBoardCoords(frame1, redColor)
 
-otherBoard.board = Detection.ReadBoard(frame2, pinkColor, orangeColor, redColor)
-print(otherBoard)
+board.board = Detection.ReadBoard(frame1, pinkColor, orangeColor, coords, debug=True)
 
-movement = board.ExtractMovement(otherBoard)
+otherBoard.board = Detection.ReadBoard(frame2, pinkColor, orangeColor, coords, debug=True)
 
+movement = board.FindMovement(otherBoard, debug=True)
 print(movement)

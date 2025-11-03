@@ -1,13 +1,7 @@
 from __future__ import annotations
+from constants import *
 import copy 
 import random
-
-# Color codes for console output
-red = "\033[31m"
-blue = "\033[34m"
-white = "\033[37m"
-yellow = "\033[33m"
-green = "\033[32m"
 
 class Movement:
     """Provides functionality to easily store and compare board movements"""
@@ -76,11 +70,11 @@ class Board:
             difficulty (int, optional): Difficulty of the game, affects default values of certain behaviours, between 1 and 5. Defaults to 3
         """
         self.board = [[0 for _ in range(size + 2)] for _ in range(size)]
-        assert turn in range(-1, 2),  red + f"Attempted to create board {repr(self)} invalid turn ID" + white
+        assert turn in range(-1, 2),  red + f"Attempted to create board {repr(self)} with invalid turn ID" + white
         self.turn = turn
-        assert size % 2 == 0, red + f"Attempted to create board {repr(self)} invalid size" + white
+        assert size % 2 == 0, red + f"Attempted to create board {repr(self)} with invalid size" + white
         self.size = size
-        assert difficulty in range(1, 6), red + f"Attempted to create board {repr(self)} invalid difficulty" + white
+        assert difficulty in range(1, 6), red + f"Attempted to create board {repr(self)} with invalid difficulty" + white
         self.difficulty = difficulty
         self.turnCount = 1
         self.staleTurns = 0
@@ -98,45 +92,54 @@ class Board:
             boardStr += red + "Red moves" + white + "\n"
         boardStr += yellow
         for i in range(self.size + 4):
-            if i == 0 or i == self.size + 3:
-                boardStr += "x "
+            if i == 0:
+                boardStr += "c | x "
+            elif i == self.size + 3:
+                boardStr += "x | c "
             elif i == 1 or i == self.size + 2:
                 boardStr += "| "
             else:
                 boardStr += f"{i - 1} "
         boardStr += "\n" + white
         for i in range(self.size):
-            boardStr += yellow + f"{i + 1} " + white
-            for j in range(self.size + 4):
-                if j == 1 or j == self.size + 2:
+            for j in range(self.size + 11):
+                pos = [-1, -1]
+                if j in [1, 3, self.size + 7, self.size + 5]:
                     boardStr += yellow + "| " + white
-                else:
-                    pos = [i, j - 1]
-                    if not self.InsideBounds(pos):
-                        continue
-                    tile = self.GetTileAtPos(pos)
-                    if tile == 0:
-                        boardStr += "· "
-                    elif tile > 0:
-                        boardStr += blue
-                        if tile == 1:
-                            boardStr += "o "
-                        else:
-                            boardStr += "O "
-                        boardStr += white
+                elif j in [2, self.size + 6]:
+                    boardStr += yellow + f"{i + 1} " + white
+                elif j == 0:
+                    pos = [i, 0]
+                elif j in range(4, self.size + 4):
+                    pos = [i, j - 3]
+                elif j == self.size + 8:
+                    pos = [i, self.size + 1]
+                if not self.InsideBounds(pos) and not self.InsideBounds(pos, game = False):
+                    continue
+                tile = self.GetTileAtPos(pos)
+                if tile == 0:
+                    boardStr += "· "
+                elif tile > 0:
+                    boardStr += blue
+                    if tile == 1:
+                        boardStr += "o "
                     else:
-                        boardStr += red
-                        if tile == -1:
-                            boardStr += "ø "
-                        else:
-                            boardStr += "Ø "
-                        boardStr += white
-            boardStr += yellow + f"{i + 1} " + white
+                        boardStr += "O "
+                    boardStr += white
+                else:
+                    boardStr += red
+                    if tile == -1:
+                        boardStr += "ø "
+                    else:
+                        boardStr += "Ø "
+                    boardStr += white
             boardStr += "\n"
         boardStr += yellow
         for i in range(self.size + 4):
-            if i == 0 or i == self.size + 3:
-                boardStr += "x "
+            if i == 0:
+                boardStr += "c | x "
+            elif i == self.size + 3:
+                boardStr += "x | c "
             elif i == 1 or i == self.size + 2:
                 boardStr += "| "
             else:
@@ -206,7 +209,7 @@ class Board:
                 j += 1
                 board[i][j] = self.board[i][j]
         else:
-            for i, j in [(x, y) for x in range(0, self.size) for y in range(0, [0, self.size + 2])]:
+            for i, j in [(x, y) for x in range(0, self.size) for y in [0, self.size + 2]]:
                 board[i][j] = self.board[i][j]
         for i in board:
             count += i.count(ID)
@@ -414,7 +417,7 @@ class Board:
         assert self.size == other.size, red + "Could not find movement between different sized boards" + white
         changeValues = self.ExtractChangeValues(other, debug)
         movesTable = self.BuildMovementsTable(debug)
-        boardClone = Board(self.turn, board.size)
+        boardClone = Board(self.turn, self.size)
         for i, j in [(x, y) for x in range(0, self.size) for y in range(0, self.size + 2)]:
             for movement in movesTable[i][j]:
                 boardClone.board = self.CreateClone(debug)
@@ -607,6 +610,3 @@ class AI:
                     score += board.turn * mults[1]
         if debug: print(green + f"Assigned score of [{score}] to movement {movement} for board {repr(board)}" + white)
         return score
-
-board = Board(1, 8)
-board.InsideBounds([6, 2], game = False, debug = True)
