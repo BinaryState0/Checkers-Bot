@@ -24,9 +24,9 @@ import re
             - Higher depth increases computing time exp
 """
 
-debug = False # Debug mode
+debug = True # Debug mode
 auto = True # AI vs AI
-boardSize = 8 # 6 and 8 tested
+boardSize = 6 # 6 and 8 tested
 
 def GetInput(type: str, message: str):
     """Unified function to obtain different types of input from the user
@@ -77,6 +77,7 @@ def Main():
                 input(yellow + "Invalid selection, press enter to try again" + white)
                 print(gameBoard)
                 Main() 
+            inputPos = Tile(inputPos[0], inputPos[1])
             posMoves = gameBoard.PossibleMovements(inputPos, debug)
             if len(posMoves[1]) == 0:
                 input(yellow + "Invalid selection, press enter to try again" + white)
@@ -107,7 +108,7 @@ def Main():
                     print("Game has ended, the player wins")
                 gameBoard.turn = 0
                 Main()
-            movement = AI.MiniMax(gameBoard, debug=debug)
+            movement = MiniMax(gameBoard, debug=debug)
             gameBoard.MoveTile(movement[0], debug=debug)
             gameBoard.ChangeTurn(debug)
             print(gameBoard)
