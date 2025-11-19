@@ -68,7 +68,7 @@ def Centroid(contour, debug = False):
     else: #Avoids division by 0 if area is 0
         cX, cY = 0, 0
     if debug: print(_green + f"Found center coordinates [{cX}, {cY}] for a contour" + _white)
-    return [cX, cY]
+    return (cX, cY)
 def FindBoardCoords(frame, size = 6, debug = False) -> list[list[list[int]]]:
     """Finds the coordinates of a Nx(N+2) board.
     Args:
@@ -164,7 +164,8 @@ def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]
         lowestDist = float("inf")
         tile = Tile(-1, -1, 1)
         for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
-            dist = math.dist(centroid, coords[i][j])
+            target = [coords[i][j][0], coords[i][j][1]]
+            dist = numpy.linalg.norm(centroid, target)
             if dist < lowestDist:
                 lowestDist = dist
                 tile.x, tile.y = i, j
@@ -175,7 +176,8 @@ def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]
         lowestDist = float("inf")
         tile = Tile(-1, -1, -1)
         for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
-            dist = math.dist(centroid, coords[i][j])
+            target = [coords[i][j][0], coords[i][j][1]]
+            dist = numpy.linalg.norm(centroid, target)
             if dist < lowestDist:
                 lowestDist = dist
                 tile.x, tile.y = i, j
@@ -183,7 +185,7 @@ def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]
         if debug: print(_green + f"Assigned {tile}" + _white)
     if debug:
         foundBoard = Board(turn = 0, size = size, debug = debug)
-        foundBoard.board = board
+        foundBoard.board = board.board
         print(_green + f"Board detected, printing simulated board:" + _white)
         print(foundBoard)
     return board.board

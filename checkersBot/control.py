@@ -14,10 +14,10 @@ _green = "\033[32m"
 _cyan = "\033[96m"
 
 #TODO tweak values
-_Hover = 40
-_Contact = 20
+_Hover = 50
+_Contact = 25
 
-def Transform(coords, origin: list[int] = [310, 390, 0], scale: int = 0.81967, rotation: list[int] = [180, 0, 270], debug = False) -> list[int]: 
+def Transform(coords, origin: list[int] = [305, 390, 0], scale = 0.942, rotation: list[int] = [180, 0, 270], debug = False) -> list[int]: 
     """Transforms between camera and robot coordinates
     Args:
         coords (list[int]): X, Y, Z coordinates to transform.
@@ -135,7 +135,7 @@ class Robot:
             rClient (RobotClient): The robot client to utilize.
             relay (int, optional): Relay to connect for controlling actions. Defaults to 1
         """
-        assert rClient.connected, _red + f"The client must be connected to initialize a Robot class" + _white
+        #assert rClient.connected, _red + f"The client must be connected to initialize a Robot class" + _white
         self.rClient = rClient
         if debug: print(_cyan + f"Initialized robot client {repr(self)} with address [{rClient.address}]" + _white)
     def MoveRobot(self, movement: Tile3DMovement, delay: int = 1, debug = False):
@@ -214,7 +214,7 @@ class Robot:
             steps.append(Tile(int(pos[0]), int(pos[1])))
         movement2d = TileMovement(steps, debug)
         movement3d = self.Movement2Dto3D(movement2d, debug)
-        self.MoveRobot(movement3d, 0.5, debug=debug)
+        self.MoveRobot(movement3d, 1, debug=debug)
         if debug: print(_cyan + f"Finished testing for RC {self.rClient.address}" + _white)
     def Emote(self, emote: str = "hi", length = 10, delay = 1, debug = False):
         """Predefined movements for the RC to perform
@@ -279,9 +279,9 @@ class Robot:
         changeTable = prevBoard.ExtractChangeValues(targetBoard, debug)
         for i, j in [(x, y) for x in range(0, targetBoard.height) for y in range(0, targetBoard.width)]:
             if changeTable[i][j] == 1:
-                tileTo = targetBoard[i][j]
+                tileTo = targetBoard.board[i][j]
             elif changeTable[i][j] == -1:
-                tileFrom = prevBoard[i][j]
+                tileFrom = prevBoard.board[i][j]
             else:
                 continue
             changedTiles.extend([tileTo, tileFrom])
