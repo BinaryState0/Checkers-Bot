@@ -69,7 +69,7 @@ def Centroid(contour, debug = False):
         cX, cY = 0, 0
     if debug: print(_green + f"Found center coordinates [{cX}, {cY}] for a contour" + _white)
     return [cX, cY]
-def FindBoardCoords(frame, boardMarkers: Color, size = 6, window = 10, threshold = 100, debug = False) -> list[list[list[int]]]:
+def FindBoardCoords(frame, size = 6, debug = False) -> list[list[list[int]]]:
     """Finds the coordinates of a Nx(N+2) board.
     Args:
         frame (numpy.array): Image to search in.
@@ -83,14 +83,24 @@ def FindBoardCoords(frame, boardMarkers: Color, size = 6, window = 10, threshold
     if debug: print(_green + f"Searching for board coordinates" + _white)
     coords = [[[] for _ in range(8)] for _ in range(6)]
     corners = []
+    arDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    arParams = cv2.aruco.DetectorParameters()
+    mCorners, mIDs, _ = cv2.aruco.detectMarkers(frame, arDict, parameters=arParams)
+    assert mIDs is not None, _red + "No ArUco markers detected" + _white
+    cv2.aruco.drawDetectedMarkers(frame, mCorners, mIDs)
     if debug: Show(frame)
-    contours = Contours(frame, boardMarkers, window, threshold, debug=debug) #Detects contours of corner markers
-    assert len(contours) < 5, _red + f"Corner identification found too many contours, sdearch values must be tweaked." + _white
-    assert len(contours) > 3, _red + f"Corner identification found too few contours, sdearch values must be tweaked." + _white
-    for c in contours:
-        centroid = Centroid(c)
-        corners.append(centroid)
+    mIDs = mIDs.flatten()
+    expected_ids = [1, 2, 3, 4]
+    found_ids = set(mIDs.tolist())
+    missing = set(expected_ids) - found_ids
+    assert not missing, _red + f"Missing ArUco markers: {missing}" + _white
+    for i, id in enumerate(mIDs):
+        if id in expected_ids:
+            c = mCorners[i][0]
+            centroid = numpy.mean(c, axis=0)  # average of the 4 corners
+            corners.append(centroid)
     corners = numpy.array(corners, dtype=numpy.float32)
+    corners = numpy.round(corners).astype(int)
     #Sort corners: top-left, top-right, bottom-right, bottom-left
     sum = corners.sum(axis=1)
     diff = numpy.diff(corners, axis=1)
@@ -101,7 +111,7 @@ def FindBoardCoords(frame, boardMarkers: Color, size = 6, window = 10, threshold
     ordered[3] = corners[numpy.argmax(diff)] #bottom-left
     corners = ordered
     if debug: print(_green + f"Found corner coordinates {corners}" + _white)
-    numRows, numCols = size, size + 2
+    numRows, numCols = size + 2, size + 2
     cellSize = 20
     boardWidth = cellSize * numCols
     boardHeight = cellSize * numRows
@@ -114,9 +124,9 @@ def FindBoardCoords(frame, boardMarkers: Color, size = 6, window = 10, threshold
     M = cv2.getPerspectiveTransform(corners, dstCorners)
     MInv = numpy.linalg.inv(M)
     #This next block is credited to multiple stackoverflow posts and a touch of chatGPT (I have no idea what kind of math is happening here)
-    for i, j in [(x, y) for x in range(numRows) for y in range(numCols)]:
+    for i, j in [(x, y) for x in range(numRows - 2) for y in range(numCols)]:
         #Normalized interpolation parameters inside the warped rectangle
-        a = (i) / (numRows - 1)  #vertical fraction (0 to 1)
+        a = (i + 1) / (numRows - 1)  #vertical fraction (0 to 1)
         b = (j) / (numCols - 1)  #horizontal fraction (0 to 1)
         #Bilinear interpolation of the 4 corners in warped space
         posWarped = (
@@ -132,7 +142,7 @@ def FindBoardCoords(frame, boardMarkers: Color, size = 6, window = 10, threshold
         coords[i][j] = posOrig
         if debug: cv2.circle(frame, tuple(posOrig), 5, (0, 0, 150), -1)
     if debug: Show(frame)
-    return coords
+    return coords, corners
 def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]]], size = 6, debug = False) -> list[list[Tile]]:
     """Finds tiles in a frame and uses known board coordinates to construct a board of size Nx(N+2)
     Args:

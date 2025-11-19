@@ -13,10 +13,11 @@ _yellow = "\033[33m"
 _green = "\033[32m"
 _cyan = "\033[96m"
 
-_Hover = 0
-_Contact = 0
+#TODO tweak values
+_Hover = 40
+_Contact = 20
 
-def Transform(coords, origin: list[int] = [320, 480], scale: int = 0.81967, rotation: list[int] = [180, 0, 90], debug = False) -> list[int]: 
+def Transform(coords, origin: list[int] = [310, 390, 0], scale: int = 0.81967, rotation: list[int] = [180, 0, 270], debug = False) -> list[int]: 
     """Transforms between camera and robot coordinates
     Args:
         coords (list[int]): X, Y, Z coordinates to transform.
@@ -27,8 +28,7 @@ def Transform(coords, origin: list[int] = [320, 480], scale: int = 0.81967, rota
         list[int]: Transformed coordinates
     """
     assert len(coords) == 3, _red + f"Coordinates must have 3 values." + _white
-    assert len(coords) == 3, _red + f"Coordinates must have 3 values." + _white
-    assert len(coords) == 3, _red + f"Rotation must have 3 axis." + _white
+    assert len(rotation) == 3, _red + f"Rotation must have 3 axis." + _white
     assert 0 < scale, _red + f"Scale must be greater than 0." + _white
     if debug: print(_green + f"Transforming coordinates {coords} to system with origin {origin}, scale {scale} and reltive rotation {rotation}" + _white)
     coords = [coords[0], coords[1], coords[2]]
@@ -54,7 +54,6 @@ def Transform(coords, origin: list[int] = [320, 480], scale: int = 0.81967, rota
     ])
     R = Rz @ Ry @ Rx #Applies rotation on X, then Y, then Z
     transformedCoords = scale * (R @ relativeCoords)
-    transformedCoords[1] = -1 * transformedCoords[1] #Y axis is inverted to account for coordinate system handedness differences
     transformedCoords = numpy.round(transformedCoords).astype(int)
     transformedCoords = transformedCoords.tolist()
     if debug: print(_green + f"Calculated coordinates as {transformedCoords}" + _white)
@@ -76,7 +75,7 @@ class Tile3D:
         self.ON = ON
     def __repr__(self):
         string = f"Tile3D[{self.x}, {self.y}, {self.z}]"
-        if self.isOn: string += "(1)"
+        if self.ON: string += "(1)"
         else: string += "(0)"
         return string
     def __eq__(self, other):
@@ -147,7 +146,7 @@ class Robot:
             delay (int, optional): Movement delay in seconds. Defaults to 1.
         """
         if debug: print(_cyan + f"Following {movement} with RC {self.rClient.address}" + _white)
-        for step in movement:
+        for step in movement.steps:
             self.rClient.move_xyz(step.x, step.y, step.z)
             sleep(delay)
             self.rClient.set_relay_status(step.ON)
@@ -178,7 +177,7 @@ class Robot:
         print(_cyan + f"RC {self.rClient.address} has saved an image and is returning to its home position" + _white)
         sleep(delay)
         return frame
-    def Movement2Dto3D(movement: TileMovement, debug = False):
+    def Movement2Dto3D(self, movement: TileMovement, debug = False):
         """Converts a 2D TileMovement from the checkers module to a Tile3DMovement
 
         Args:
@@ -189,13 +188,13 @@ class Robot:
         """
         if debug: print(_cyan + f"Converting {movement} to {Tile3DMovement}" + _white)
         steps = []
-        for step in movement:
+        for step in movement.steps:
             if debug: print(_cyan + f"Converting {step}" + _white)
-            pos = [step.x, step.y]
+            pos = [step.x, step.y, 0]
             pos = Transform(pos, debug=debug)
             step1 = Tile3D(pos[0], pos[1], _Hover, True)
             step2 = Tile3D(pos[0], pos[1], _Contact, False)
-            if next() is not None:
+            if next is not None:
                 step3 = Tile3D(pos[0], pos[1], _Contact, True)
                 step4 = Tile3D(pos[0], pos[1], _Hover, True)
             steps.extend([step1, step2, step3, step4])
@@ -207,14 +206,15 @@ class Robot:
         Args:
             coords (list[list[list[int]]]): Known board coordinates
         """
+        assert coords is not None, _red + f"Coordinates for RC {self.rClient.address} cant be null" + _white
         if debug: print(_cyan + f"Testing board movement for RC {self.rClient.address}" + _white)
         steps = []
         for i, j in [(x, y) for x in range(0, len(coords)) for y in range(0, len(coords[x]))]:
-            pos = Transform(coords[i][j], debug=debug)
-            steps.append(Tile(pos[0], pos[1]))
+            pos = [coords[i][j][0], coords[i][j][1]]#Transform([coords[i][j][0], coords[i][j][1], 0], debug=debug)
+            steps.append(Tile(int(pos[0]), int(pos[1])))
         movement2d = TileMovement(steps, debug)
         movement3d = self.Movement2Dto3D(movement2d, debug)
-        self.MoveRobot(movement3d, debug=debug)
+        self.MoveRobot(movement3d, 0.5, debug=debug)
         if debug: print(_cyan + f"Finished testing for RC {self.rClient.address}" + _white)
     def Emote(self, emote: str = "hi", length = 10, delay = 1, debug = False):
         """Predefined movements for the RC to perform
@@ -256,10 +256,14 @@ class Robot:
                     sleep(delay)
             self.rClient.home()
             sleep(delay)
-        if emote == "think":
-            pass
         if emote == "dance":
-            pass
+            from random import randint
+            for i in range(length):
+                q0, q1, q2, = [randint(45, 135) for _ in range(3)]
+                self.rClient.set_joints(q0, q1, q2)
+                sleep(delay)
+            self.rClient.home()
+            sleep(delay)
     def MoveToBoard(self, prevBoard: Board, targetBoard: Board, debug = False) -> TileMovement:
         """Generates a movemement that moves all the pieces in the board to match another state.
 
