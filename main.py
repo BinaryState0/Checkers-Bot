@@ -20,8 +20,8 @@ boardCoords = None
 virtualBoard = Board(0)
 prevBoard = Board(0)
 currentBoard = Board(0)
-playerColor = Color(164, 255, 255)
-AIColor = Color(60, 255, 255)
+playerColor = Color(35, 85, 120)
+AIColor = Color(110, 250, 80)
 debug = True
 
 def Start():
@@ -59,16 +59,24 @@ def Start():
     else:
         Start()
 def Main():
-    global markerColor, playerColor, AIColor, RC, virtualBoard, debug, boardCoords
+    global playerColor, AIColor, RC, virtualBoard, debug, boardCoords
     """Main loop"""
     if virtualBoard.turn == 0:
-        boardCoords = FindBoardCoords(RC.MoveAndCapture(debug), markerColor, debug=debug)
+        boardCoords = FindBoardCoords(RC.MoveAndCapture(debug), debug=debug)
         prevBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
         virtualBoard.SetBoard(debug)
         for movement in RC.MoveToBoard(prevBoard, virtualBoard, debug):
             RC.MoveRobot(movement, debug=debug)
         Main()
     else:
+        prevBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
+        for i in [-2, -1, 1, -2]:
+            if  (
+                prevBoard.GetAmmountOf(i, False, debug) + prevBoard.GetAmmountOf(i, True, debug) != 
+                virtualBoard.GetAmmountOf(i, False, debug) + virtualBoard.GetAmmountOf(i, True, debug)
+            ):
+                RC.Emote("no", 2, 1.5, debug=debug)
+                Main()
         if virtualBoard != prevBoard:
             RC.Emote("no", debug=debug)
             for movement in RC.MoveToBoard(prevBoard, virtualBoard, debug):
@@ -80,23 +88,33 @@ def Main():
                 virtualBoard.turn = 0
                 Main()
             RC.Emote()
-            voiceInput = False
-            while voiceInput == False:
-                voiceInput = FindVoiceInput(["turn, finished, done, ready"], debug=debug)
-            currentBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
+            #voiceInput = False
+            #while voiceInput == False:
+            #    voiceInput = FindVoiceInput(["turn, finished, done, ready"], debug=debug)
+            input("Press enter to continue")
+            correct = False
+            while not correct:
+                currentBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
+                for i in [-2, -1, 1, -2]:
+                    if  (
+                        prevBoard.GetAmmountOf(i, False, debug) + prevBoard.GetAmmountOf(i, True, debug) != 
+                        virtualBoard.GetAmmountOf(i, False, debug) + virtualBoard.GetAmmountOf(i, True, debug)
+                    ):
+                        RC.Emote("no", 2, 1.5, debug=debug)
+                        input("Press enter to retry")
+                    else:
+                        correct = True
             movement = virtualBoard.FindMovement(currentBoard, debug)
             if movement is not False:
                 if virtualBoard.MoveTile(movement, debug=debug) is not False:
                     virtualBoard.MoveTile(movement, debug=debug)
                     virtualBoard.ChangeTurn(debug)
                     RC.Emote("yes", debug=debug)
-                    prevBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
                     Main()
             virtualBoard.board = prevBoard.board
             RC.Emote("no", debug=debug)
             for movement in RC.MoveToBoard(currentBoard, prevBoard, debug):
                 RC.MoveRobot(movement, debug=debug)
-            prevBoard.board = ReadBoard(RC.MoveAndCapture(debug=debug), playerColor, AIColor, boardCoords, debug=debug)
             Main()
         else:
             if virtualBoard.IsCheckmate(debug) or virtualBoard.IsStalemate(debug=debug):
