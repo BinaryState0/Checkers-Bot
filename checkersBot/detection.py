@@ -18,11 +18,28 @@ def Show(frame, id = "IMAGE", debug = False):
         id (str, optional): Display name of the given frame. Defaults to "IMAGE".
     """
     assert isinstance(id, str), _red + f"Display name for frame must be a string" + _white
-    if debug:  print(_green + f"Showing frame with id {id}" + _white)
+    if debug: print(_green + f"Showing frame with id {id}" + _white)
     cv2.imshow(id, frame) #Shows image
     cv2.waitKey(0) #Waits for input
     cv2.destroyAllWindows() #Closes window
-def Contours(frame, color: Color, window = 0, threshold = 0, debug = False):
+    if debug:
+        from datetime import datetime
+        import os
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+        IMAGES_DIR = os.path.join(PROJECT_ROOT, "IMAGES")
+        filename = f"CAPTURE_{datetime.now().strftime('%d%m%Y%H%M')}.jpeg"
+        cv2.imwrite(os.path.join(IMAGES_DIR, filename), frame)
+def AvgHSV(frame, x, y, w):
+    h, W, _ = frame.shape
+    x1 = max(0, x - w // 2)
+    x2 = min(W, x + w // 2)
+    y1 = max(0, y - w // 2)
+    y2 = min(h, y + w // 2)
+    region = frame[y1:y2, x1:x2]
+    mean = region.reshape(-1, 3).mean(axis=0)
+    return tuple(mean.astype(int))
+def Contours(frame, color: Color, window = 20, threshold = 50, debug = False):
     """Returns an array of contours
     Args:
         frame (numpy.array): Frame to search for contours.
@@ -81,7 +98,7 @@ def FindBoardCoords(frame, size = 6, debug = False) -> list[list[list[int]]]:
         list[list[list[int]]]: Nx(N+2) Array of lists representing coordinates.
     """
     if debug: print(_green + f"Searching for board coordinates" + _white)
-    coords = [[[] for _ in range(8)] for _ in range(6)]
+    coords = [[[] for _ in range(size + 2)] for _ in range(size)]
     corners = []
     arDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     arParams = cv2.aruco.DetectorParameters()
@@ -143,8 +160,8 @@ def FindBoardCoords(frame, size = 6, debug = False) -> list[list[list[int]]]:
         if debug: cv2.circle(frame, tuple(posOrig), 5, (0, 0, 150), -1)
     if debug: Show(frame)
     return coords, corners
-def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]]], size = 6, debug = False) -> list[list[Tile]]:
-    """Finds tiles in a frame and uses known board coordinates to construct a board of size Nx(N+2)
+def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]]], size = 6, window = 20, debug = False) -> list[list[Tile]]:
+    """Finds tiles in a frame using known board coordinates to construct a board of size Nx(N+2)
     Args:
         frame (numpy.array): Frame to search in.
         player1 (Color): Color of player1 Tiles (1).
@@ -154,38 +171,69 @@ def ReadBoard(frame, player1: Color, player2: Color, coords: list[list[list[int]
     Returns:
         list[list[Tile]]: Board with ID values of each player's tile positions
     """
+    coords = coords[0]
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     if debug: print(_green + f"Reading board for players with color codes {player1} and {player2}" + _white)
     board = Board(0, size, debug)
-    player1Tiles = Contours(frame, player1, 10, 100)
-    player2Tiles = Contours(frame, player2, 10, 100)
-    if debug: print(_green + f"Found [{len(player1Tiles)}] tiles for player1 and [{len(player2Tiles)}] tiles for player 2" + _white)
-    for tile in player1Tiles:
-        centroid = Centroid(tile, debug=debug)
-        lowestDist = float("inf")
-        tile = Tile(-1, -1, 1)
-        for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
-            target = [coords[i][j][0], coords[i][j][1]]
-            dist = numpy.linalg.norm(centroid, target)
-            if dist < lowestDist:
-                lowestDist = dist
-                tile.x, tile.y = i, j
-        board[tile.x][tile.y] = tile
-        if debug: print(_green + f"Assigned {tile}" + _white)
-    for tile in player2Tiles:
-        centroid = Centroid(tile, debug=debug)
-        lowestDist = float("inf")
-        tile = Tile(-1, -1, -1)
-        for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
-            target = [coords[i][j][0], coords[i][j][1]]
-            dist = numpy.linalg.norm(centroid, target)
-            if dist < lowestDist:
-                lowestDist = dist
-                tile.x, tile.y = i, j
-        board[tile.x][tile.y] = tile
-        if debug: print(_green + f"Assigned {tile}" + _white)
+    for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
+        target = numpy.array([coords[i][j][0], coords[i][j][1]])
+        if debug: print(_green + f"Searching at coordinates [{target}]" + _white)
+        (h, s, v) = AvgHSV(frame, target[0], target[1], 10)
+        targetColor = Color(h, s, v)
+        if debug: print(_green + f"Fpound color {targetColor}" + _white)
+        targetColorUpper = targetColor.AsRange(window, False)
+        targetColorLower = targetColor.AsRange(window, True)
+        isPlayer1 = numpy.all((targetColorLower <= player1.AsArray()) & (player1.AsArray() <= targetColorUpper))
+        isPlayer2 = numpy.all((targetColorLower <= player2.AsArray()) & (player2.AsArray() <= targetColorUpper))
+        if isPlayer1:
+            tile = Tile(i, j, 1)
+            board.board[tile.x][tile.y] = tile
+            cv2.circle(frame, tuple(coords[i][j]), 5, (0, 255, 255), -1)
+            if debug: print(_green + f"Assigned {tile}" + _white)
+        elif isPlayer2:
+            tile = Tile(i, j, -1)
+            board.board[tile.x][tile.y] = tile
+            cv2.circle(frame, tuple(coords[i][j]), 5, (255, 0, 0), -1)
+            if debug: print(_green + f"Assigned {tile}" + _white)
+        else:
+            tile = Tile(i, j, 0)
+            board.board[tile.x][tile.y] = tile
+            cv2.circle(frame, tuple(coords[i][j]), 5, (0, 0, 150), -1)
+            if debug: print(_green + f"Assigned {tile}" + _white)
+    #player1Tiles = Contours(frame, player1, window=40)
+    #player2Tiles = Contours(frame, player2)
+    #if debug: print(_green + f"Found [{len(player1Tiles) + 1}] tiles for player1 and [{len(player2Tiles) + 1}] tiles for player 2" + _white)
+    #for tile in player1Tiles:
+    #    centroid = Centroid(tile, debug=debug)
+    #    lowestDist = float("inf")
+    #    tile = Tile(-1, -1, 1)
+    #    for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
+    #        print(str(i) + "" + str(j))
+    #        target = numpy.array([coords[i][j][0], coords[i][j][1]])
+    #        centroid = numpy.array(centroid)
+    #        dist = numpy.linalg.norm(numpy.array(centroid) - numpy.array(target))
+    #        if dist < lowestDist:
+    #            lowestDist = dist
+    #            tile.x, tile.y = i, j
+    #    board[tile.x][tile.y] = tile
+    #    if debug: print(_green + f"Assigned {tile}" + _white)
+    #for tile in player2Tiles:
+    #    centroid = Centroid(tile, debug=debug)
+    #    lowestDist = float("inf")
+    #    tile = Tile(-1, -1, -1)
+    #    for i, j in [(x, y) for x in range(0, size) for y in range(0, size + 2)]:
+    #        target = numpy.array([coords[i][j][0], coords[i][j][1]])
+    #        centroid = numpy.array(centroid)
+    #        dist = numpy.linalg.norm(numpy.array(centroid) - numpy.array(target))
+    #        if dist < lowestDist:
+    #            lowestDist = dist
+    #            tile.x, tile.y = i, j
+    #    board[tile.x][tile.y] = tile
+    #    if debug: print(_green + f"Assigned {tile}" + _white)
     if debug:
         foundBoard = Board(turn = 0, size = size, debug = debug)
         foundBoard.board = board.board
         print(_green + f"Board detected, printing simulated board:" + _white)
         print(foundBoard)
+        Show(frame, debug=debug)
     return board.board

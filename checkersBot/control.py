@@ -171,9 +171,6 @@ class Robot:
         frame = self.rClient.capture()
         if debug: Show(frame, f"RAWIMAGE from RC [{self.rClient.address}]")
         self.rClient.home()
-        if debug:
-            from datetime import datetime
-            cv2.imwrite(f"../IMAGES/CAPTURE{datetime.now().strftime('%d%m%Y%H%M')}.jpeg", frame)
         print(_cyan + f"RC {self.rClient.address} has saved an image and is returning to its home position" + _white)
         sleep(delay)
         return frame
